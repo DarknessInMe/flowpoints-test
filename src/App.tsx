@@ -30,42 +30,41 @@ const dragData: DragDataType[] = [
 ];
 
 const App: React.FC = () => {
-	const [diagram, setDiagram] = useState<Array<DiagramType>>([]);
-	const [cache, setCache] = useState<DragDataType | null>(null);
+	const [diagram, setDiagram] = useState<DiagramType[]>([]);
 
 	const dropZoneOnDropHandler = (
 		e: React.DragEvent<HTMLElement>
 	): void | boolean => {
 		e.preventDefault();
 
-		if (cache) {
-			if (
-				!validateDrop(
-					diagram.length === 0 ? 0 : diagram[diagram.length - 1].value,
-					cache.value
-				)
-			) {
-				console.log("Wrong order");
-				return false;
+		const cache = JSON.parse(e.dataTransfer.getData("cache"));
+
+		if (
+			!validateDrop(
+				diagram.length === 0 ? 0 : diagram[diagram.length - 1].value,
+				cache.value
+			)
+		) {
+			console.log("Wrong order");
+			return false;
+		}
+
+		const newKey = unique("point_");
+
+		const newDiagramPoint = {
+			key: newKey,
+			startPosition: { x: e.clientX - 20, y: e.clientY - 20 },
+			content: cache.content,
+			value: cache.value,
+			outputs: null,
+		};
+		setDiagram((prev) => {
+			if (prev[prev.length - 1]) {
+				prev[prev.length - 1].outputs = [newKey];
 			}
 
-			const newKey = unique("point_");
-
-			const newDiagramPoint = {
-				key: newKey,
-				startPosition: { x: e.clientX - 20, y: e.clientY - 20 },
-				content: cache.content,
-				value: cache.value,
-				outputs: null,
-			};
-			setDiagram((prev) => {
-				if (prev[prev.length - 1]) {
-					prev[prev.length - 1].outputs = [newKey];
-				}
-
-				return [...prev, newDiagramPoint];
-			});
-		}
+			return [...prev, newDiagramPoint];
+		});
 	};
 
 	const graphVertexOnDropHandler = (
@@ -73,44 +72,45 @@ const App: React.FC = () => {
 		currentDiagram: DiagramType
 	): void | boolean => {
 		e.stopPropagation();
+		const cache = JSON.parse(e.dataTransfer.getData("cache"));
 
-		if (cache) {
-			const prevKey = currentDiagram.outputs
-				? currentDiagram.outputs[currentDiagram.outputs.length - 1]
-				: "";
-			const prevValue = diagram.find((element) => element.key === prevKey);
-			if (!validateDrop(prevValue ? prevValue.value : 0, cache.value)) {
-				console.log("wrong order");
-				return false;
-			}
+		const prevKey = currentDiagram.outputs
+			? currentDiagram.outputs[currentDiagram.outputs.length - 1]
+			: "";
 
-			const newKey = unique("point_");
-
-			const newDiagramPoint = {
-				key: newKey,
-				startPosition: { x: e.clientX, y: e.clientY + 50 },
-				content: cache.content,
-				value: cache.value,
-				outputs: null,
-			};
-
-			setDiagram((prev) =>
-				prev.map((prevElement) => {
-					if (prevElement.key === currentDiagram.key) {
-						return Array.isArray(prevElement.outputs)
-							? {
-									...prevElement,
-									outputs: [...prevElement.outputs, newKey],
-							  }
-							: { ...prevElement, outputs: [newKey] };
-					}
-
-					return prevElement;
-				})
-			);
-
-			setDiagram((prev) => [...prev, newDiagramPoint]);
+		const prevValue = diagram.find((element) => element.key === prevKey);
+		console.log(prevKey, prevValue);
+		if (!validateDrop(prevValue ? prevValue.value : 0, cache.value)) {
+			console.log("wrong order");
+			return false;
 		}
+
+		const newKey = unique("point_");
+
+		const newDiagramPoint = {
+			key: newKey,
+			startPosition: { x: e.clientX, y: e.clientY + 50 },
+			content: cache.content,
+			value: cache.value,
+			outputs: null,
+		};
+
+		setDiagram((prev) =>
+			prev.map((prevElement) => {
+				if (prevElement.key === currentDiagram.key) {
+					return Array.isArray(prevElement.outputs)
+						? {
+								...prevElement,
+								outputs: [...prevElement.outputs, newKey],
+						  }
+						: { ...prevElement, outputs: [newKey] };
+				}
+
+				return prevElement;
+			})
+		);
+
+		setDiagram((prev) => [...prev, newDiagramPoint]);
 	};
 
 	return (
@@ -154,15 +154,18 @@ const App: React.FC = () => {
 							key={index}
 							className='dragElement'
 							draggable={true}
-							onDragStart={() => {
-								setCache({
-									content: dragElement.content,
-									value: dragElement.value,
-								});
+							onDragStart={(e: React.DragEvent<HTMLElement>) => {
+								e.dataTransfer.setData(
+									"cache",
+									JSON.stringify({
+										content: dragElement.content,
+										value: dragElement.value,
+									})
+								);
 							}}
 							onDragEnd={(e: React.DragEvent<HTMLElement>) => {
 								e.preventDefault();
-								setCache(null);
+								e.dataTransfer.clearData();
 							}}
 						>
 							{dragElement.content.title}
